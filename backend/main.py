@@ -20,6 +20,15 @@ from core.fusion import FusionEngine
 from core.reader import ESP32Reader
 from routers import upload, analysis, hardware, ai_insights
 
+# ESP32 WebSocket receiver and live inference
+from esp32_receiver import (
+    esp32_websocket_handler,
+    dashboard_websocket_handler,
+    get_ecg_buffer, get_emg_buffer, get_eeg_buffer,
+    is_esp32_connected,
+)
+import live_inference
+
 
 # Global model instances
 ecg_model = ECGModel()
@@ -43,6 +52,9 @@ async def lifespan(app: FastAPI):
     # Inject models into analysis router
     analysis.set_models(ecg_model, emg_model, eeg_model, fusion_engine)
     hardware.set_reader(esp32_reader)
+
+    # Inject models into live inference module (for ESP32 real-time analysis)
+    live_inference.set_models(ecg_model, emg_model, eeg_model, fusion_engine)
 
     print("[OK] All models loaded. Server ready.")
     yield
@@ -84,6 +96,10 @@ async def root():
             "hardware": "/api/hardware",
             "ai": "/api/ai",
             "websocket": "/ws/stream",
+            "esp32_ws": "/ws/esp32",
+            "dashboard_ws": "/ws/dashboard",
+            "inference": "/api/inference",
+            "sensor_buffers": "/api/sensor/buffers",
         },
     }
 
@@ -98,6 +114,7 @@ async def health_check():
             "eeg": eeg_model.loaded,
         },
         "hardware": esp32_reader.status,
+        "esp32_ws": is_esp32_connected(),
     }
 
 
@@ -121,6 +138,39 @@ async def websocket_stream(websocket: WebSocket):
         print("[WS] Client disconnected")
     except Exception as e:
         print(f"[WS] Error: {e}")
+
+
+# ─── ESP32 WebSocket Endpoints ─────────────────────────────
+
+@app.websocket("/ws/esp32")
+async def esp32_ws(websocket: WebSocket):
+    """WebSocket endpoint for ESP32 device to send sensor data."""
+    await esp32_websocket_handler(websocket)
+
+
+@app.websocket("/ws/dashboard")
+async def dashboard_ws(websocket: WebSocket):
+    """WebSocket endpoint for dashboard clients to receive live sensor data."""
+    await dashboard_websocket_handler(websocket)
+
+
+# ─── Live Inference REST Endpoints ─────────────────────────
+
+@app.get("/api/inference")
+async def run_inference():
+    """Run all ML classifiers on current ESP32 sensor buffers and return fused results."""
+    return live_inference.run_live_inference()
+
+
+@app.get("/api/sensor/buffers")
+async def get_sensor_buffers():
+    """Return raw rolling buffer arrays from ESP32 sensors."""
+    return {
+        "ecg": get_ecg_buffer(),
+        "emg": get_emg_buffer(),
+        "eeg": get_eeg_buffer(),
+        "esp32_connected": is_esp32_connected(),
+    }
 
 
 if __name__ == "__main__":

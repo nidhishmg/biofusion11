@@ -4,8 +4,9 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   ArrowLeft, Heart, Zap, Brain, Activity, Download, Upload,
   CheckCircle, AlertCircle, Loader2, FileText, ChevronRight,
-  Sparkles, Clock, Play
+  Sparkles, Clock, Play, Wifi, WifiOff, AlertTriangle, Radio
 } from "lucide-react";
+import { useESP32Stream } from "@/hooks/useESP32Stream";
 import { useAnalysisStore } from "@/store/analysisStore";
 import { ECGPanel } from "@/components/ECGPanel";
 import { EMGPanel } from "@/components/EMGPanel";
@@ -227,6 +228,10 @@ export function Analysis() {
   const [isRunning, setIsRunning] = useState(false);
   const [runError, setRunError] = useState<string | null>(null);
   const [sessionStart, setSessionStart] = useState<Date | null>(null);
+  const [hardwareMode, setHardwareMode] = useState(false);
+
+  // ESP32 live stream hook
+  const { ecgHistory, emgHistory, eegLatest, leadOff, connected, inference } = useESP32Stream();
 
   const [ecgFile, setEcgFile] = useState<FileState>({ file: null, status: "idle", filename: null, error: null, meta: null });
   const [emgFile, setEmgFile] = useState<FileState>({ file: null, status: "idle", filename: null, error: null, meta: null });
@@ -402,10 +407,24 @@ export function Analysis() {
           </button>
 
           <div className="flex items-center gap-3">
-            <span className="text-xs font-bold px-3 py-1 rounded-full border border-teal-500/40 text-teal-400 bg-teal-500/10">
-              FILE UPLOAD
+            <span className={`text-xs font-bold px-3 py-1 rounded-full border ${
+              hardwareMode
+                ? "border-cyan-500/40 text-cyan-400 bg-cyan-500/10"
+                : "border-teal-500/40 text-teal-400 bg-teal-500/10"
+            }`}>
+              {hardwareMode ? "LIVE HARDWARE" : "FILE UPLOAD"}
             </span>
             {hasResults && <SessionTimer startTime={sessionStart} />}
+            {hardwareMode && (
+              <div className={`flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full border ${
+                connected
+                  ? "text-green-400 border-green-500/30 bg-green-500/10"
+                  : "text-red-400 border-red-500/30 bg-red-500/10"
+              }`}>
+                {connected ? <Wifi className="w-3 h-3" /> : <WifiOff className="w-3 h-3" />}
+                {connected ? "ESP32 Connected" : "ESP32 Offline"}
+              </div>
+            )}
           </div>
 
           <div className="flex items-center gap-3">
@@ -533,6 +552,30 @@ export function Analysis() {
               </button>
             )}
 
+            {/* Hardware Mode */}
+            <div className="pt-2 border-t border-white/5">
+              <motion.button
+                onClick={() => { setHardwareMode(!hardwareMode); if (!hardwareMode) setSessionStart(new Date()); }}
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                className={`w-full py-2.5 rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition-all border ${
+                  hardwareMode
+                    ? "bg-cyan-500/20 border-cyan-500/40 text-cyan-400"
+                    : "bg-white/5 border-white/10 text-gray-400 hover:text-gray-200 hover:border-white/20"
+                }`}
+              >
+                <Radio className="w-3.5 h-3.5" />
+                {hardwareMode ? "Exit Hardware Mode" : "Live Hardware Mode"}
+                {hardwareMode && connected && (
+                  <motion.div
+                    className="w-1.5 h-1.5 rounded-full bg-green-400"
+                    animate={{ opacity: [1, 0.3, 1] }}
+                    transition={{ duration: 1, repeat: Infinity }}
+                  />
+                )}
+              </motion.button>
+            </div>
+
             {/* Demo shortcut */}
             <div className="pt-2 border-t border-white/5">
               <p className="text-xs text-gray-600 text-center mb-2">Or try with demo data</p>
@@ -540,7 +583,7 @@ export function Analysis() {
                 {(["normal", "stress", "arrhythmia", "sudep"] as const).map((s) => (
                   <button
                     key={s}
-                    onClick={() => { store.loadDemoData(s); setSessionStart(new Date()); }}
+                    onClick={() => { setHardwareMode(false); store.loadDemoData(s); setSessionStart(new Date()); }}
                     className="py-1.5 rounded-lg text-xs border border-white/10 text-gray-400 hover:text-gray-200 hover:border-white/20 capitalize transition-colors"
                   >
                     {s === "sudep" ? "SUDEP" : s.charAt(0).toUpperCase() + s.slice(1)}
@@ -622,7 +665,170 @@ export function Analysis() {
               </div>
             )}
 
-            {!isRunning && !hasResults && (
+            {/* Hardware Mode Live Display */}
+            {hardwareMode && (
+              <div className="space-y-4 h-full">
+                {/* Lead-off Warning */}
+                {leadOff && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="flex items-center gap-3 px-4 py-3 rounded-xl bg-yellow-500/10 border border-yellow-500/30"
+                  >
+                    <AlertTriangle className="w-5 h-5 text-yellow-400 flex-shrink-0" />
+                    <div>
+                      <p className="text-sm font-semibold text-yellow-400">Electrode Lead-Off Detected</p>
+                      <p className="text-xs text-yellow-400/70">Check ECG electrode connections (RA, LA, RL)</p>
+                    </div>
+                  </motion.div>
+                )}
+
+                {/* Connection Status */}
+                {!connected && (
+                  <div className="flex flex-col items-center justify-center h-full gap-5">
+                    <motion.div
+                      animate={{ scale: [1, 1.1, 1] }}
+                      transition={{ duration: 2, repeat: Infinity }}
+                      className="w-20 h-20 rounded-full border-2 border-red-500/30 flex items-center justify-center bg-red-500/5"
+                    >
+                      <WifiOff className="w-8 h-8 text-red-400" />
+                    </motion.div>
+                    <div className="text-center">
+                      <p className="text-lg font-semibold text-gray-300 mb-1">Waiting for ESP32...</p>
+                      <p className="text-sm text-gray-500 max-w-sm">Connect your ESP32 device to WiFi and ensure it's configured to send data to this backend at <code className="text-cyan-400">ws://your-pc-ip:8000/ws/esp32</code></p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Live Waveforms & Inference */}
+                {connected && (
+                  <div className="space-y-4">
+                    {/* Live Waveforms Grid */}
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                      {/* ECG Waveform */}
+                      <div className="rounded-xl border border-white/10 bg-white/3 p-4">
+                        <div className="flex items-center gap-2 mb-3">
+                          <Heart className="w-4 h-4 text-red-400" />
+                          <span className="text-sm font-semibold text-red-400">ECG — Live</span>
+                          <motion.div className="w-1.5 h-1.5 rounded-full bg-red-400 ml-auto" animate={{ opacity: [1, 0.3, 1] }} transition={{ duration: 1, repeat: Infinity }} />
+                        </div>
+                        <div className="h-32 flex items-end gap-px">
+                          {ecgHistory.slice(-200).map((v, i) => (
+                            <div key={i} className="flex-1 bg-red-400/60 rounded-t-sm" style={{ height: `${Math.min(100, Math.max(2, ((v - 1000) / 2000) * 100))}%` }} />
+                          ))}
+                          {ecgHistory.length === 0 && <p className="text-xs text-gray-600 m-auto">Waiting for data...</p>}
+                        </div>
+                      </div>
+
+                      {/* EMG Waveform */}
+                      <div className="rounded-xl border border-white/10 bg-white/3 p-4">
+                        <div className="flex items-center gap-2 mb-3">
+                          <Zap className="w-4 h-4 text-emerald-400" />
+                          <span className="text-sm font-semibold text-emerald-400">EMG — Live</span>
+                          <motion.div className="w-1.5 h-1.5 rounded-full bg-emerald-400 ml-auto" animate={{ opacity: [1, 0.3, 1] }} transition={{ duration: 1, repeat: Infinity }} />
+                        </div>
+                        <div className="h-32 flex items-end gap-px">
+                          {emgHistory.slice(-200).map((v, i) => (
+                            <div key={i} className="flex-1 bg-emerald-400/60 rounded-t-sm" style={{ height: `${Math.min(100, Math.max(2, ((v - 1000) / 2000) * 100))}%` }} />
+                          ))}
+                          {emgHistory.length === 0 && <p className="text-xs text-gray-600 m-auto">Waiting for data...</p>}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* EEG Band Powers */}
+                    {eegLatest && (
+                      <div className="rounded-xl border border-white/10 bg-white/3 p-4">
+                        <div className="flex items-center gap-2 mb-3">
+                          <Brain className="w-4 h-4 text-purple-400" />
+                          <span className="text-sm font-semibold text-purple-400">EEG Band Power — Simulated</span>
+                        </div>
+                        <div className="grid grid-cols-4 gap-3">
+                          {[
+                            { band: "Alpha", value: eegLatest.alpha, color: "#8b5cf6", range: "8–13 Hz" },
+                            { band: "Beta", value: eegLatest.beta, color: "#3b82f6", range: "13–30 Hz" },
+                            { band: "Theta", value: eegLatest.theta, color: "#06b6d4", range: "4–8 Hz" },
+                            { band: "Delta", value: eegLatest.delta, color: "#10b981", range: "0.5–4 Hz" },
+                          ].map((b) => (
+                            <div key={b.band} className="text-center">
+                              <div className="h-20 flex items-end justify-center mb-2">
+                                <motion.div
+                                  className="w-8 rounded-t-md"
+                                  style={{ backgroundColor: b.color + "99" }}
+                                  animate={{ height: `${Math.min(100, (b.value / 60) * 100)}%` }}
+                                  transition={{ duration: 0.3 }}
+                                />
+                              </div>
+                              <p className="text-xs font-semibold" style={{ color: b.color }}>{b.band}</p>
+                              <p className="text-xs text-gray-500">{b.value.toFixed(1)}</p>
+                              <p className="text-xs text-gray-600">{b.range}</p>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Live Inference Results */}
+                    {inference && (
+                      <div className="grid grid-cols-1 lg:grid-cols-4 gap-3">
+                        {/* ECG Diagnosis */}
+                        <div className="rounded-xl border border-white/10 bg-white/3 p-4">
+                          <div className="flex items-center gap-2 mb-2">
+                            <Heart className="w-3.5 h-3.5 text-red-400" />
+                            <span className="text-xs font-semibold text-gray-300">ECG Diagnosis</span>
+                          </div>
+                          <p className="text-lg font-bold text-white">{inference.ecg?.predictions?.predicted_class || "—"}</p>
+                          <p className="text-xs text-gray-500">HR: {inference.ecg?.features?.hr_bpm?.toFixed(0) || "—"} BPM</p>
+                        </div>
+
+                        {/* EMG Status */}
+                        <div className="rounded-xl border border-white/10 bg-white/3 p-4">
+                          <div className="flex items-center gap-2 mb-2">
+                            <Zap className="w-3.5 h-3.5 text-emerald-400" />
+                            <span className="text-xs font-semibold text-gray-300">EMG Status</span>
+                          </div>
+                          <p className="text-lg font-bold text-white">{inference.emg?.predictions?.gesture || "—"}</p>
+                          <p className="text-xs text-gray-500">Fatigue: {inference.emg?.predictions?.fatigue_level || "—"}</p>
+                        </div>
+
+                        {/* EEG State */}
+                        <div className="rounded-xl border border-white/10 bg-white/3 p-4">
+                          <div className="flex items-center gap-2 mb-2">
+                            <Brain className="w-3.5 h-3.5 text-purple-400" />
+                            <span className="text-xs font-semibold text-gray-300">Mental State</span>
+                          </div>
+                          <p className="text-lg font-bold text-white">{inference.eeg?.predictions?.mental_state || "—"}</p>
+                          <p className="text-xs text-gray-500">Dominant: {inference.eeg?.predictions?.dominant_band || "—"}</p>
+                        </div>
+
+                        {/* Fusion Risk */}
+                        <div className={`rounded-xl border p-4 ${
+                          inference.fusion?.risk_level === "CRITICAL" ? "border-red-500/40 bg-red-500/10" :
+                          inference.fusion?.risk_level === "HIGH" ? "border-orange-500/40 bg-orange-500/10" :
+                          inference.fusion?.risk_level === "MODERATE" ? "border-yellow-500/40 bg-yellow-500/10" :
+                          "border-green-500/40 bg-green-500/10"
+                        }`}>
+                          <div className="flex items-center gap-2 mb-2">
+                            <Activity className="w-3.5 h-3.5 text-amber-400" />
+                            <span className="text-xs font-semibold text-gray-300">Fusion Risk</span>
+                          </div>
+                          <p className={`text-lg font-bold ${
+                            inference.fusion?.risk_level === "CRITICAL" ? "text-red-400" :
+                            inference.fusion?.risk_level === "HIGH" ? "text-orange-400" :
+                            inference.fusion?.risk_level === "MODERATE" ? "text-yellow-400" :
+                            "text-green-400"
+                          }`}>{inference.fusion?.risk_level || "LOW"}</p>
+                          <p className="text-xs text-gray-500">{inference.fusion?.primary_condition || "Normal"}</p>
+                          <p className="text-xs text-gray-600 mt-1">{((inference.fusion?.risk_score ?? 0) * 100).toFixed(0)}% risk score</p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {!isRunning && !hasResults && !hardwareMode && (
               <div className="flex flex-col items-center justify-center h-full gap-6 text-center">
                 <div className="w-16 h-16 rounded-2xl flex items-center justify-center bg-white/5">
                   <Upload className="w-8 h-8 text-gray-600" />
@@ -648,7 +854,7 @@ export function Analysis() {
                 </div>
                 <div className="flex gap-2 items-center text-xs text-gray-600">
                   <Play className="w-3 h-3" />
-                  Or use the demo shortcuts in the sidebar
+                  Or use the demo shortcuts / hardware mode in the sidebar
                 </div>
               </div>
             )}
