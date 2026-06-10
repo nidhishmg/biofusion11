@@ -1,0 +1,32 @@
+# Ignore Python virtual environments
+.venv/
+
+# VS Code settings
+.vscode/
+
+# Node modules
+node_modules/
+
+# Build outputs
+dist/
+build/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Env files
+.env
+.env.*
+
+# Large model files
+backend/models_saved/ecg_model.pkl

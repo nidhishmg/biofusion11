@@ -1,0 +1,1199 @@
+You are building BioFusion AI — a complete full-stack web application 
+for real-time and file-based multimodal biosignal analysis using 
+ECG, EMG, and EEG signals with AI-powered diagnostics.
+
+This is NOT a Streamlit app. Build a proper full-stack web application:
+- Backend: Python FastAPI
+- Frontend: React.js with TailwindCSS
+- Communication: REST API + WebSocket for real-time streaming
+- Charts: Recharts + Plotly.js
+- Theme: Dark medical/clinical aesthetic
+
+═══════════════════════════════════════════════════════════
+COMPLETE FILE STRUCTURE
+═══════════════════════════════════════════════════════════
+
+biofusion/
+├── backend/
+│   ├── main.py                    ← FastAPI entry point
+│   ├── routers/
+│   │   ├── upload.py              ← File upload endpoints
+│   │   ├── analysis.py            ← ML analysis endpoints
+│   │   ├── hardware.py            ← ESP32 serial endpoints
+│   │   └── ai_insights.py        ← Claude/GPT AI insights
+│   ├── core/
+│   │   ├── pipeline.py            ← Signal processing
+│   │   ├── ecg_model.py           ← ECG ML model
+│   │   ├── emg_model.py           ← EMG ML model
+│   │   ├── eeg_model.py           ← EEG ML model
+│   │   ├── fusion.py              ← Fusion engine
+│   │   └── reader.py              ← ESP32 serial reader
+│   ├── models_saved/              ← Trained .pkl files
+│   ├── data/
+│   │   ├── mitdb/                 ← MIT-BIH ECG dataset
+│   │   ├── eeg/                   ← CHB-MIT EEG .edf files
+│   │   └── emg/                   ← EMG .csv/.dat/.hea files
+│   ├── train/
+│   │   ├── train_ecg.py
+│   │   ├── train_emg.py
+│   │   └── train_eeg.py
+│   └── requirements.txt
+│
+├── frontend/
+│   ├── src/
+│   │   ├── pages/
+│   │   │   ├── Landing.jsx        ← Landing page
+│   │   │   └── Analysis.jsx       ← Full analysis page
+│   │   ├── components/
+│   │   │   ├── Navbar.jsx
+│   │   │   ├── HeroSection.jsx
+│   │   │   ├── UploadSection.jsx
+│   │   │   ├── HardwareSection.jsx
+│   │   │   ├── DemoSection.jsx
+│   │   │   ├── AnalysisNav.jsx    ← ECG/EMG/EEG/BioFusion tabs
+│   │   │   ├── ECGPanel.jsx
+│   │   │   ├── EMGPanel.jsx
+│   │   │   ├── EEGPanel.jsx
+│   │   │   ├── FusionPanel.jsx
+│   │   │   ├── WaveformChart.jsx
+│   │   │   ├── RiskGauge.jsx
+│   │   │   └── AIInsightCard.jsx
+│   │   ├── hooks/
+│   │   │   ├── useWebSocket.js
+│   │   │   └── useAnalysis.js
+│   │   ├── store/
+│   │   │   └── analysisStore.js   ← Zustand state
+│   │   ├── App.jsx
+│   │   └── main.jsx
+│   ├── package.json
+│   └── tailwind.config.js
+│
+└── README.md
+
+═══════════════════════════════════════════════════════════
+PAGE 1 — LANDING PAGE (Landing.jsx)
+═══════════════════════════════════════════════════════════
+
+Design: Dark deep-navy background (#050d1a), 
+animated gradient mesh, glassmorphism cards.
+Feel: Like a real medical AI product — Vercel meets hospital.
+
+── SECTION 1: NAVBAR ──
+Fixed top navbar, blur backdrop, border bottom glow:
+Left: "BioFusion AI" logo — glowing teal text, 
+      small heartbeat line animation beside it
+Right: "Docs" | "GitHub" | "Launch App →" (glowing button)
+
+── SECTION 2: HERO ──
+Full viewport height.
+Center content:
+
+Large badge pill at top:
+"AI-Powered Clinical Biosignal Intelligence"
+(subtle animated border, teal glow)
+
+Main heading (huge, 72px):
+"Understand Your Body's
+Three Languages"
+Gradient text: teal → purple → pink
+
+Subheading (20px, muted):
+"BioFusion AI simultaneously analyzes ECG, EMG, and EEG signals
+to detect complex clinical conditions no single sensor can identify."
+
+Three animated signal preview lines below heading:
+- Red ECG waveform animating left to right
+- Green EMG burst pattern
+- Purple EEG alpha wave
+All three overlaid on a dark card, labeled, animating on loop.
+
+Three CTA buttons in a row:
+[Upload Files →]  [Connect Hardware →]  [Try Demo →]
+Each with different accent color (teal, blue, purple)
+
+Scroll indicator arrow bouncing at bottom
+
+── SECTION 3: WHAT WE DETECT ──
+Heading: "What BioFusion Detects"
+Subtitle: "Cross-system conditions traditional single-signal 
+           devices miss entirely"
+
+5 condition cards in a grid (2+2+1 layout):
+Each card has:
+- Condition name (large)
+- Severity badge (CRITICAL / HIGH / MODERATE)
+- Signal tags [ECG] [EEG] [EMG]
+- One-line explanation
+- Subtle animated glow border on hover
+
+Cards:
+1. SUDEP Risk | CRITICAL | ECG+EEG
+   "Cardiac arrest triggered by seizure activity"
+2. Motor Neuron Pattern | HIGH | EMG+EEG
+   "Early ALS/motor neuron degeneration signature"
+3. Autonomic Stress | MODERATE | ECG+EMG+EEG
+   "Panic attack — all three systems elevated"
+4. Cardiac Arrhythmia | HIGH | ECG
+   "PVC/Atrial fibrillation detected"
+5. Muscle Fatigue Pattern | MODERATE | EMG
+   "Neuromuscular fatigue with frequency shift"
+
+── SECTION 4: HOW IT WORKS ──
+Heading: "Three Signals. One Intelligence."
+3-step visual flow:
+
+Step 1 — Acquire
+Icon: chip/sensor
+"Connect ESP32 hardware or upload your ECG/EMG/EEG files"
+
+Step 2 — Process
+Icon: waveform
+"Pan-Tompkins peak detection, FFT band analysis, 
+ IIR filtering — all in real time"
+
+Step 3 — Diagnose
+Icon: brain/heart
+"Three ML models + fusion engine outputs named 
+ clinical conditions with AI explanations"
+
+Animated arrow connecting each step.
+
+── SECTION 5: INPUT MODES ──
+Three large cards side by side:
+
+Card 1 — Upload Files:
+Title: "Upload Your Data"
+Subtitle: "Supports ECG (.dat/.csv/.hea), 
+           EMG (.csv/.dat), EEG (.edf/.csv)"
+File format pills: MIT-BIH | CHB-MIT | CSV | EDF | DAT
+[Upload & Analyze →] button
+Drag and drop zone preview
+
+Card 2 — Hardware Mode:
+Title: "Live ESP32 Stream"
+Subtitle: "Connect ESP32 with AD8232 + EMG module 
+           for real-time analysis"
+Status dot animation (pulsing green = connected)
+[Connect Device →] button
+Shows port selector dropdown preview
+
+Card 3 — Demo Mode:
+Title: "Try Without Hardware"
+Subtitle: "Explore all features with clinical 
+           demo scenarios"
+4 scenario pills: Normal | Stress | Arrhythmia | SUDEP
+[Launch Demo →] button
+
+── SECTION 6: STATS BAR ──
+4 animated number counters:
+48 MIT-BIH Records | 3 ML Models | 5 Disease Detections | <1s Inference
+
+── SECTION 7: FOOTER ──
+"BioFusion AI — Built for REVA University ECE Hackathon"
+GitHub link | Tech stack pills
+
+═══════════════════════════════════════════════════════════
+PAGE 2 — ANALYSIS PAGE (Analysis.jsx)
+═══════════════════════════════════════════════════════════
+
+This page opens after clicking any CTA on landing.
+Full dark clinical dashboard.
+
+── TOP BAR ──
+Left: "← BioFusion AI" back to landing
+Center: Session type badge — 
+  "FILE UPLOAD" | "LIVE HARDWARE" | "DEMO MODE"
+  + filename if upload mode
+Right: Session timer | Export PDF button | Status indicator
+
+── INPUT PANEL (top of page, collapsible) ──
+Shows active input mode.
+
+If UPLOAD mode:
+  Large drag-drop zone:
+  "Drop ECG, EMG, or EEG files here"
+  Accepts: .dat, .hea, .csv, .edf
+  
+  File type detection:
+  - .edf → auto-detected as EEG (CHB-MIT format)
+  - .dat + .hea pair → auto-detected as ECG/EMG (WFDB format)
+  - .csv → show column selector (which column is signal)
+  
+  Support the exact files from the dataset:
+  ECG: MIT-BIH .dat/.hea files (use wfdb to read)
+  EEG: chb01_01.edf, chb01_02.edf etc. (use pyedflib/mne)
+  EMG: emg_healthy.csv, emg_myopathy.csv, 
+       emg_neuropathy.csv (pandas read_csv)
+  
+  After upload: show file preview card with:
+  - Detected signal type
+  - Duration, sample rate, channels
+  - [Run Analysis] button
+
+If HARDWARE mode:
+  Port selector dropdown (auto-scans COM ports)
+  [Connect] button with animated status
+  Real-time packet counter
+
+If DEMO mode:
+  Scenario selector:
+  [Normal] [Physical Stress] [Arrhythmia] [SUDEP Risk]
+  Auto-cycles every 60 seconds with transition animation
+
+── ANALYSIS NAVIGATION BAR ──
+Sticky mini navbar below input panel.
+4 tabs with colored indicators:
+
+[❤ ECG]  [💪 EMG]  [🧠 EEG]  [⚡ BioFusion]
+
+Each tab has:
+- Icon + label
+- Colored bottom border when active
+  (ECG=red, EMG=green, EEG=purple, Fusion=amber)
+- Small score badge showing current risk probability
+- Animated pulse dot if signal is live
+
+═══════════════════════════════════════════════════════════
+TAB 1 — ECG PANEL (ECGPanel.jsx)
+═══════════════════════════════════════════════════════════
+
+LAYOUT: 2 columns (waveform left 60%, analysis right 40%)
+
+LEFT COLUMN:
+
+Main ECG waveform chart:
+- Library: Recharts LineChart or Plotly
+- Dark background #0d1117
+- Bright red ECG line (#ef4444), linewidth 1.5
+- R-peaks marked as white dots with tooltip showing RR interval
+- Zoomable + pannable
+- Time range selector: [5s] [10s] [30s] [Full]
+- Grid: subtle #1f2937
+
+Below main chart — 3 sub-charts side by side:
+1. RR Interval Tachogram (bar chart, beat-by-beat)
+2. HRV Power Spectrum (frequency domain, FFT plot)
+   Show LF band (0.04-0.15Hz), HF band (0.15-0.4Hz) colored
+3. Poincaré Plot (scatter, RR[n] vs RR[n+1])
+   Shows SD1, SD2 ellipse overlay
+   SD1 = short-term variability, SD2 = long-term
+
+RIGHT COLUMN:
+
+Vital metrics cards (2x2 grid):
+- Heart Rate: large number, color coded, trend arrow
+- HRV (RMSSD): ms value, quality indicator
+- QRS Width: ms value, normal/wide indicator
+- pNN50: percentage, interpretation text
+
+Signal Quality Indicator:
+Circular gauge 0-100%
+Color: red<40, yellow 40-70, green>70
+"Signal Quality Index"
+
+ECG Classifier Results:
+Title: "Arrhythmia Detection"
+Model: "Random Forest | Trained on MIT-BIH (48 records)"
+Accuracy badge: "89.2% accuracy"
+
+Probability bars for each class:
+████████████░░  Normal       78%  ← green bar
+██░░░░░░░░░░░░  PVC           8%  ← yellow bar  
+█░░░░░░░░░░░░░  Atrial        5%  ← orange bar
+█░░░░░░░░░░░░░  Block         9%  ← red bar
+
+Detected class badge: 
+Large pill "NORMAL SINUS RHYTHM" in green
+Or "PVC DETECTED" in red with pulse animation
+
+Beat-by-beat annotation log:
+Scrollable table showing last 20 beats:
+Time | Beat Type | RR Interval | Classification
+
+AI Recommendation Card (bottom):
+Dark card with purple left border
+"AI Clinical Insight"
+Generated text about the ECG findings:
+e.g. "Heart rate of 72 BPM with RMSSD of 45ms indicates 
+healthy autonomic function. No significant arrhythmia 
+detected. HRV metrics suggest good cardiovascular fitness."
+[Regenerate Insight] button
+
+═══════════════════════════════════════════════════════════
+TAB 2 — EMG PANEL (EMGPanel.jsx)
+═══════════════════════════════════════════════════════════
+
+LAYOUT: 2 columns
+
+LEFT COLUMN:
+
+Main EMG waveform with dual overlay:
+- Raw filtered signal: dim green (#064e3b), thin line
+- Envelope overlay: bright green (#10b981), thick line
+- Activation threshold line: dashed white
+- Burst regions highlighted with green shading
+- Zoomable
+
+Below — 3 sub-charts:
+1. Power Spectral Density (PSD) — line chart
+   X: frequency 0-500Hz, Y: power
+   Highlight muscle band 20-450Hz in green
+   Show mean frequency as vertical dashed line
+   (Mean frequency drops = muscle fatigue)
+
+2. Feature Timeline — multi-line chart
+   Show RMS, MAV over time as two colored lines
+   X: time, Y: normalized value
+   Legend with colored labels
+
+3. Frequency Fatigue Index
+   Bar chart showing mean frequency per 
+   time window — bars change from green→yellow→red
+   as fatigue increases
+
+RIGHT COLUMN:
+
+Gesture Classification:
+Large animated display:
+Current gesture in huge text with icon:
+  ✊ FIST | 🖐 OPEN | 👆 POINT | — REST
+Confidence: 94.2%
+Animated confidence arc around the icon
+
+Probability bars for 4 gestures:
+REST | FIST | OPEN | POINT
+
+Muscle Fatigue Meter:
+Vertical gauge like a thermometer:
+0-33%: Fresh (green)
+33-66%: Mild Fatigue (yellow)  
+66-100%: High Fatigue (red)
+Current mean frequency value below
+
+EMG Classification:
+If using emg_healthy.csv → "Healthy Neuromuscular Pattern"
+If using emg_myopathy.csv → "Myopathy Pattern Detected"
+If using emg_neuropathy.csv → "Neuropathy Pattern Detected"
+Model: "SVM-RBF Classifier"
+Accuracy badge: "91.4%"
+
+Signal stats table:
+RMS | MAV | Zero Crossing Rate | Waveform Length
+values in a clean 2x2 grid
+
+AI Recommendation Card:
+e.g. "Moderate muscle fatigue detected with mean frequency 
+shift from 95Hz to 68Hz, indicating progressive motor unit 
+synchronization. Pattern consistent with healthy fatigue 
+response. No neuropathy or myopathy indicators present."
+
+═══════════════════════════════════════════════════════════
+TAB 3 — EEG PANEL (EEGPanel.jsx)
+═══════════════════════════════════════════════════════════
+
+LAYOUT: 2 columns
+
+LEFT COLUMN:
+
+Main EEG waveform:
+- Purple line (#8b5cf6)
+- Amplitude in microvolts (µV) on Y-axis
+- Shows characteristic alpha/beta oscillations
+- Zoomable, scrollable
+
+Below — 3 sub-charts:
+1. Band Power Spectrum — area chart
+   5 colored bands stacked:
+   Delta: blue, Theta: teal, Alpha: purple, 
+   Beta: amber, Gamma: red
+   X: frequency, Y: power spectral density
+   Interactive hover showing exact power values
+
+2. Band Power Over Time — stacked area chart
+   Shows how each band changes over session duration
+   Each band a different color, stacked areas
+
+3. Topographic Map (simulated, single channel):
+   Simple circular head diagram showing Fp1/Fp2 
+   electrode positions with color intensity showing
+   current activity level
+   (Use SVG circle with colored dots at electrode positions)
+
+RIGHT COLUMN:
+
+Mental State Display:
+Large animated card:
+RELAXED / FOCUSED / NEUTRAL / DROWSY
+With smooth transition animation between states
+Color: green=relaxed, blue=focused, 
+       yellow=neutral, gray=drowsy
+
+Band Power Donut Chart:
+Plotly donut chart showing relative power of each band:
+Delta | Theta | Alpha | Beta | Gamma
+Hover shows percentage and absolute values
+
+Alpha/Beta Ratio Gauge:
+Horizontal gauge:
+< 0.8 = FOCUSED (blue)
+0.8-1.5 = NEUTRAL (yellow)
+> 1.5 = RELAXED (green)
+Current value indicator
+
+Seizure Risk Indicator:
+Large badge:
+"LOW SEIZURE RISK (0.04)" — green
+"MODERATE SEIZURE RISK (0.52)" — yellow
+"HIGH SEIZURE RISK (0.78)" — red, pulsing
+
+Model: "SVM on CHB-MIT Dataset"
+Accuracy: "87.3%"
+
+Engagement Index:
+β / (α + θ) formula displayed
+Numeric value with interpretation:
+"High cognitive engagement" / "Low engagement"
+
+AI Recommendation Card:
+e.g. "Alpha dominant state (ratio 1.82) indicates deep 
+relaxation. Theta elevation suggests possible drowsiness. 
+No epileptiform activity detected. Spectral entropy of 4.2 
+bits consistent with healthy neural background activity."
+
+═══════════════════════════════════════════════════════════
+TAB 4 — BIOFUSION PANEL (FusionPanel.jsx)
+═══════════════════════════════════════════════════════════
+
+This is the most important tab. Show everything together.
+
+── TOP: MASTER RISK DASHBOARD ──
+
+Large risk gauge (Plotly go.Indicator):
+Circular gauge 0.0 to 1.0
+Color zones:
+  0.0-0.3: GREEN (#10b981)
+  0.3-0.65: YELLOW (#f59e0b)
+  0.65-0.85: ORANGE (#f97316)
+  0.85-1.0: RED (#ef4444) + pulse animation
+
+Current value displayed large in center
+"Overall Risk Score" label below
+
+Risk level badge beside gauge:
+"LOW RISK" | "MODERATE RISK" | "HIGH RISK" | "CRITICAL"
+
+Detected condition card (most prominent element):
+Large card with colored left border based on severity:
+  Condition name: 24px bold white
+  Severity pill: color-coded
+  Reason text: 14px muted
+  Signal badges: [ECG] [EMG] [EEG] in channel colors
+  "Detected at: HH:MM:SS"
+  Confidence: "87.4%"
+
+── MIDDLE: THE KEY INNOVATION — TRIPLE SIGNAL OVERLAY ──
+
+Title: "Synchronized Tri-Modal Signal View"
+Subtitle: "All three physiological systems in one timeline"
+
+ONE large chart showing all 3 signals overlaid:
+- ECG line: red (#ef4444), normalized 0-1
+- EMG line: green (#10b981), normalized 0-1  
+- EEG line: purple (#8b5cf6), normalized 0-1
+- All share same time axis (X)
+- Each signal normalized separately for visibility
+- Legend with colored labels + toggle visibility 
+  (click legend to show/hide each signal)
+- Y-axis shows "Normalized Amplitude"
+- Grid lines subtle
+- Hover shows all 3 values at that timestamp
+- Zoom + pan enabled
+- Highlighted regions when cross-modal events detected
+  (red shaded zone = risk event)
+
+Below triple chart — Cross-Signal Correlation Matrix:
+3x3 heatmap (Plotly):
+  Axes: ECG, EMG, EEG
+  Color: RdYlGn scale -1 to +1
+  Cell values shown as numbers
+  Title: "Cross-Modal Correlation"
+  Subtitle: "High ECG-EEG correlation = connected cardiac-neural event"
+
+── BOTTOM: DISEASE RULE ENGINE RESULTS ──
+
+Title: "Clinical Pattern Analysis"
+
+All 5 disease rules evaluated and displayed:
+Each as a card showing:
+- Rule name
+- Condition: GREEN tick = not detected, RED alert = detected
+- Contributing signals
+- Individual probabilities that fed this rule
+
+Cards:
+1. SUDEP Risk
+   EEG seizure prob: [0.12] ECG arrhythmia: [0.08]
+   Status: NOT DETECTED ✓
+
+2. Motor Neuron Pattern  
+   EEG: [0.12] EMG fatigue: [0.23]
+   Status: NOT DETECTED ✓
+
+3. Autonomic Stress
+   ECG: [0.08] EEG: [0.12] EMG: [0.23]
+   Status: NOT DETECTED ✓
+
+4. Isolated Arrhythmia
+   ECG: [0.08]
+   Status: NOT DETECTED ✓
+
+5. Normal
+   Status: CONFIRMED ✓ — glowing green
+
+── AI FUSION INSIGHT ──
+
+Full-width dark card:
+"BioFusion Clinical Intelligence"
+AI-generated paragraph combining insights from all 3 signals:
+
+"Comprehensive multimodal analysis reveals a stable physiological 
+state. Cardiac monitoring shows normal sinus rhythm at 72 BPM with 
+healthy HRV (RMSSD: 45ms), suggesting good autonomic regulation. 
+Neuromuscular analysis confirms normal muscle activation patterns 
+with no fatigue indicators. EEG monitoring shows alpha-dominant 
+relaxed state with no epileptiform activity. Cross-modal correlation 
+matrix shows low ECG-EEG correlation (r=0.12) ruling out 
+cardiac-neurological coupling. Overall risk score: 0.18 (LOW). 
+No clinical intervention recommended."
+
+[Regenerate AI Analysis] button
+[Export Full Report PDF] button
+
+── RISK TREND CHART ──
+
+Line chart showing risk score over session duration:
+X: elapsed time
+Y: risk score 0-1
+Color zones as background: green/yellow/orange/red
+Annotated with condition flags as vertical lines
+"Session Duration: 00:05:32"
+
+── BOTTOM STATS ROW ──
+
+6 stat cards:
+Peak Risk Score | Conditions Flagged | Total Beats Analyzed
+Session Duration | Signal Quality | Model Confidence
+
+═══════════════════════════════════════════════════════════
+BACKEND — FastAPI (main.py + routers)
+═══════════════════════════════════════════════════════════
+
+── main.py ──
+FastAPI app with:
+- CORS middleware (allow frontend localhost:5173)
+- WebSocket endpoint for real-time streaming
+- Static file serving
+- Lifespan event: load all ML models on startup
+
+Router mounts:
+app.include_router(upload.router, prefix="/api/upload")
+app.include_router(analysis.router, prefix="/api/analysis")
+app.include_router(hardware.router, prefix="/api/hardware")
+app.include_router(ai_insights.router, prefix="/api/ai")
+
+WebSocket endpoint:
+@app.websocket("/ws/stream")
+async def stream_websocket(websocket: WebSocket):
+  Handles real-time ESP32 data streaming
+  Sends JSON every 100ms:
+  {
+    "ecg": [...500 samples...],
+    "emg": [...500 samples...],
+    "eeg": [...250 samples...],
+    "features": {...},
+    "predictions": {...},
+    "fusion": {...}
+  }
+
+── routers/upload.py ──
+
+POST /api/upload/ecg
+  Accept: .dat + .hea file pair OR .csv
+  Parser:
+    If .dat/.hea → use wfdb.rdrecord() to read
+    If .csv → pandas read_csv, detect signal column
+  Returns: 
+  {
+    "signal": [...normalized samples...],
+    "sample_rate": 360,
+    "duration_seconds": 30,
+    "num_samples": 10800,
+    "signal_type": "ECG"
+  }
+
+POST /api/upload/emg
+  Accept: .csv (emg_healthy, emg_myopathy, emg_neuropathy)
+  OR .dat/.hea pair
+  Parse with pandas or wfdb
+  Returns signal array + metadata
+  
+  IMPORTANT: The EMG CSV files have specific formats:
+  emg_healthy.csv: tab-separated, multiple columns
+  emg_myopathy.csv: same format
+  emg_neuropathy.csv: same format
+  Auto-detect separator, use first signal column
+  Label: extract condition from filename 
+  (healthy/myopathy/neuropathy)
+
+POST /api/upload/eeg
+  Accept: .edf files (chb01_01.edf etc.)
+  Parse with: pyedflib or mne
+  import mne; raw = mne.io.read_raw_edf(file_path)
+  Extract first channel as primary EEG signal
+  Returns signal array + sample rate
+
+POST /api/upload/detect
+  Auto-detect file type from extension + content
+  Route to correct parser above
+  Useful for drag-drop upload of any file
+
+── routers/analysis.py ──
+
+POST /api/analysis/ecg
+  Input: {"signal": [...], "sample_rate": 360}
+  
+  Pipeline:
+  1. process_ecg(signal, fs) → filtered, peaks, features
+  2. ecg_model.predict(features) → probabilities
+  3. Return full analysis dict
+  
+  Returns:
+  {
+    "filtered_signal": [...],
+    "r_peaks": [...],
+    "features": {
+      "hr_bpm": 72.3,
+      "mean_rr": 832,
+      "std_rr": 45,
+      "rmssd": 38.2,
+      "pnn50": 22.1,
+      "qrs_width": 88
+    },
+    "predictions": {
+      "arrhythmia_probability": 0.08,
+      "predicted_class": "Normal",
+      "class_probabilities": {
+        "Normal": 0.82,
+        "PVC": 0.09,
+        "Atrial": 0.05,
+        "Block": 0.04
+      }
+    },
+    "rr_intervals": [...],
+    "hrv_spectrum": {
+      "frequencies": [...],
+      "power": [...],
+      "lf_power": 1234,
+      "hf_power": 987,
+      "lf_hf_ratio": 1.25
+    },
+    "poincare": {
+      "rr_n": [...],
+      "rr_n1": [...],
+      "sd1": 27.1,
+      "sd2": 51.3
+    }
+  }
+
+POST /api/analysis/emg
+  Input: {"signal": [...], "sample_rate": 1000, 
+          "source_file": "emg_healthy.csv"}
+  
+  Returns:
+  {
+    "filtered_signal": [...],
+    "envelope": [...],
+    "features": {
+      "rms": 0.234,
+      "mav": 0.198,
+      "zcr": 0.045,
+      "wl": 123.4,
+      "mnf": 87.3,
+      "mdf": 92.1
+    },
+    "predictions": {
+      "gesture": "Rest",
+      "gesture_confidence": 0.91,
+      "all_gesture_probs": {...},
+      "condition": "Healthy",
+      "condition_probabilities": {
+        "Healthy": 0.87,
+        "Myopathy": 0.08,
+        "Neuropathy": 0.05
+      },
+      "fatigue_score": 0.12,
+      "fatigue_level": "Fresh"
+    },
+    "psd": {
+      "frequencies": [...],
+      "power": [...],
+      "mean_frequency_over_time": [...]
+    }
+  }
+
+POST /api/analysis/eeg
+  Input: {"signal": [...], "sample_rate": 256}
+  
+  Returns:
+  {
+    "filtered_signal": [...],
+    "features": {
+      "delta_rel": 0.32,
+      "theta_rel": 0.18,
+      "alpha_rel": 0.28,
+      "beta_rel": 0.17,
+      "gamma_rel": 0.05,
+      "alpha_beta_ratio": 1.65,
+      "spectral_entropy": 4.21,
+      "engagement_index": 0.42
+    },
+    "predictions": {
+      "mental_state": "Relaxed",
+      "seizure_probability": 0.04,
+      "dominant_band": "Alpha"
+    },
+    "band_spectrum": {
+      "frequencies": [...],
+      "total_power": [...],
+      "delta_power": [...],
+      "theta_power": [...],
+      "alpha_power": [...],
+      "beta_power": [...],
+      "gamma_power": [...]
+    }
+  }
+
+POST /api/analysis/fusion
+  Input: all three analysis results combined
+  
+  Returns complete fusion output:
+  {
+    "risk_score": 0.18,
+    "risk_level": "LOW",
+    "primary_condition": "Normal",
+    "severity": "LOW",
+    "reason": "All signals within normal range",
+    "flags": [...],
+    "correlation_matrix": [[1.0, 0.12, 0.08], ...],
+    "risk_trend": "STABLE",
+    "model_confidences": {
+      "ecg": 0.82,
+      "emg": 0.87,
+      "eeg": 0.79
+    }
+  }
+
+── routers/ai_insights.py ──
+
+POST /api/ai/insight
+  Input: all analysis results
+  
+  Generate clinical insight text using template + rules:
+  (No external API needed — template-based generation)
+  
+  Template system:
+  Build insight from components:
+  - ECG summary sentence
+  - EMG summary sentence  
+  - EEG summary sentence
+  - Correlation observation
+  - Risk conclusion
+  - Recommendation
+  
+  Each component has multiple variants based on values:
+  ECG: 
+    if hr < 60: "Bradycardic pattern at {hr} BPM..."
+    if hr > 100: "Elevated heart rate at {hr} BPM..."
+    if normal: "Normal sinus rhythm at {hr} BPM with..."
+  
+  Return: {"insight": "Full paragraph text...", 
+           "key_findings": ["finding1", "finding2"]}
+
+── core/ecg_model.py ──
+
+class ECGModel:
+  
+  Training data: MIT-BIH Arrhythmia Database
+  Use wfdb to read all 48 records
+  
+  Feature extraction per beat:
+  [hr_bpm, mean_rr, std_rr, rmssd, pnn50, qrs_width,
+   lf_power, hf_power, lf_hf_ratio]
+  
+  Class labels:
+  N → Normal (class 0)
+  V → PVC (class 1)
+  A → Atrial ectopic (class 2)
+  L, R, B → Bundle branch (class 3)
+  
+  Model: RandomForestClassifier(
+    n_estimators=300,
+    max_depth=20,
+    class_weight='balanced',
+    n_jobs=-1
+  )
+  
+  Apply SMOTE for class balancing
+  
+  Target: >88% weighted F1 score
+  
+  Save to: models_saved/ecg_model.pkl
+  Save scaler: models_saved/ecg_scaler.pkl
+
+── core/emg_model.py ──
+
+class EMGModel:
+  
+  TWO separate classifiers:
+  
+  1. Gesture Classifier (SVM):
+     Features: [rms, mav, zcr, wl, ssc]
+     Classes: Rest, Fist, Open, Point
+     Trained on: synthetic + self-recorded data
+  
+  2. Condition Classifier (Random Forest):
+     Features: [rms, mav, zcr, wl, mnf, mdf, var]
+     Classes: Healthy, Myopathy, Neuropathy
+     Trained on: emg_healthy.csv, emg_myopathy.csv,
+                 emg_neuropathy.csv
+     
+     IMPORTANT: Load all three CSV files from data/emg/
+     emg_healthy.csv → label 0 (Healthy)
+     emg_myopathy.csv → label 1 (Myopathy)
+     emg_neuropathy.csv → label 2 (Neuropathy)
+     
+     Extract features from each 500ms window
+     Train RandomForest + SVM, use best
+     Target: >90% accuracy (these are clean datasets)
+  
+  Save both models to models_saved/
+
+── core/eeg_model.py ──
+
+class EEGModel:
+  
+  Training data: CHB-MIT .edf files
+  Use mne to read: mne.io.read_raw_edf()
+  
+  Seizure detection (binary):
+  Normal vs Seizure segments
+  
+  Features per 1-second window:
+  [delta_rel, theta_rel, alpha_rel, beta_rel,
+   alpha_beta_ratio, spectral_entropy, engagement_idx]
+  
+  Model: SVC(kernel='rbf', C=10, probability=True)
+  
+  Target: >87% accuracy
+  
+  Mental state (rule-based, no training needed):
+  alpha_beta_ratio > 1.5 → Relaxed
+  alpha_beta_ratio < 0.8 → Focused
+  theta_rel > 0.25 → Drowsy
+  else → Neutral
+
+═══════════════════════════════════════════════════════════
+FRONTEND DESIGN SYSTEM
+═══════════════════════════════════════════════════════════
+
+Colors (Tailwind custom + CSS variables):
+  --bg-primary: #050d1a
+  --bg-secondary: #0d1626
+  --bg-card: #111f35
+  --bg-card-hover: #162440
+  --border: #1e3a5f
+  --border-glow: #0ea5e9
+  --text-primary: #f0f9ff
+  --text-muted: #94a3b8
+  --ecg-red: #ef4444
+  --emg-green: #10b981
+  --eeg-purple: #8b5cf6
+  --fusion-amber: #f59e0b
+  --success: #22c55e
+  --warning: #f59e0b
+  --danger: #ef4444
+  --critical: #dc2626
+
+Typography:
+  Headings: Inter or Space Grotesk
+  Body: Inter
+  Monospace (signal values): JetBrains Mono
+
+Card style:
+  background: var(--bg-card)
+  border: 1px solid var(--border)
+  border-radius: 12px
+  padding: 20px
+  backdrop-filter: blur(10px)
+  transition: all 0.2s ease
+
+Glow effects (on important elements):
+  box-shadow: 0 0 20px rgba(14, 165, 233, 0.15)
+  For critical alerts: 0 0 30px rgba(239, 68, 68, 0.4)
+
+Chart container style:
+  background: #0a0f1a
+  border: 1px solid #1e3a5f
+  border-radius: 8px
+  padding: 12px
+
+Animations:
+  Waveform lines: CSS animation for scroll effect
+  Risk gauge: smooth transition on value change
+  Alert banner: pulse keyframe animation
+  Loading states: skeleton shimmer effect
+  Tab transitions: slide + fade
+
+═══════════════════════════════════════════════════════════
+FRONTEND STATE MANAGEMENT (Zustand)
+═══════════════════════════════════════════════════════════
+
+Store: analysisStore.js
+
+State:
+{
+  mode: 'idle' | 'upload' | 'hardware' | 'demo',
+  activeTab: 'ecg' | 'emg' | 'eeg' | 'fusion',
+  isAnalyzing: boolean,
+  
+  uploadedFiles: {ecg: File, emg: File, eeg: File},
+  
+  signals: {
+    ecg: Float32Array,
+    emg: Float32Array,
+    eeg: Float32Array
+  },
+  
+  ecgAnalysis: {...},
+  emgAnalysis: {...},
+  eegAnalysis: {...},
+  fusionResult: {...},
+  
+  sessionLog: [...],
+  sessionStartTime: Date,
+  
+  hardwareStatus: 'disconnected' | 'connecting' | 'connected',
+  serialPort: string,
+  
+  demoScenario: 'normal' | 'stress' | 'arrhythmia' | 'sudep'
+}
+
+Actions:
+setMode, setActiveTab, uploadFile, runAnalysis,
+updateLiveData, connectHardware, setDemoScenario,
+addToLog, exportReport
+
+═══════════════════════════════════════════════════════════
+API INTEGRATION (frontend hooks)
+═══════════════════════════════════════════════════════════
+
+useAnalysis.js hook:
+  
+  const uploadAndAnalyze = async (files) => {
+    setIsAnalyzing(true)
+    
+    // Step 1: Upload files
+    const ecgData = await api.post('/upload/ecg', formData)
+    const emgData = await api.post('/upload/emg', formData)
+    const eegData = await api.post('/upload/eeg', formData)
+    
+    // Step 2: Run analysis per channel
+    const ecgResult = await api.post('/analysis/ecg', ecgData)
+    const emgResult = await api.post('/analysis/emg', emgData)
+    const eegResult = await api.post('/analysis/eeg', eegData)
+    
+    // Step 3: Fusion
+    const fusionResult = await api.post('/analysis/fusion', 
+      {ecg: ecgResult, emg: emgResult, eeg: eegResult})
+    
+    // Step 4: AI insight
+    const insight = await api.post('/ai/insight', 
+      {ecg: ecgResult, emg: emgResult, eeg: eegResult, 
+       fusion: fusionResult})
+    
+    // Update store
+    store.setAll({ecgResult, emgResult, eegResult, 
+                  fusionResult, insight})
+    setIsAnalyzing(false)
+  }
+
+useWebSocket.js hook:
+  For hardware mode — connect to ws://localhost:8000/ws/stream
+  Parse incoming JSON → update store in real time
+
+═══════════════════════════════════════════════════════════
+CHART IMPLEMENTATIONS
+═══════════════════════════════════════════════════════════
+
+WaveformChart.jsx (reusable):
+Props: signal, color, sampleRate, peaks, label, height
+Library: Recharts LineChart
+Features: zoom, pan, peak markers, responsive
+
+Use react-plotly.js for:
+- Risk gauge (go.Indicator)
+- Correlation heatmap (go.Heatmap)
+- Band power spectrum (go.Scatter with fill)
+- Poincaré plot (go.Scatter)
+- HRV frequency domain (go.Scatter)
+
+TripleSignalChart (FusionPanel):
+Custom Recharts ComposedChart with 3 LineChart series
+Each line toggleable via legend click
+Synchronized zoom across all three
+Reference areas for detected events
+
+═══════════════════════════════════════════════════════════
+SUPPORTED FILE FORMATS — EXACT PARSING REQUIREMENTS
+═══════════════════════════════════════════════════════════
+
+ECG files (MIT-BIH format):
+  Files: 100.dat + 100.hea (must upload both together)
+  Parser: wfdb.rdrecord('data/mitdb/100')
+  Signal: record.p_signal[:,0] (first channel = MLII lead)
+  Sample rate: 360 Hz
+  
+EEG files (EDF format):
+  Files: chb01_01.edf, chb01_02.edf, chb01_03.edf, chb01_04.edf
+  Parser: mne.io.read_raw_edf(filepath, preload=True)
+  Signal: raw.get_data()[0] (first channel)
+  Sample rate: raw.info['sfreq'] (usually 256 Hz)
+  
+EMG files (CSV format from Physionet):
+  Files: emg_healthy.csv, emg_myopathy.csv, emg_neuropathy.csv
+  Parser: pd.read_csv(filepath, sep='\t') or sep=','
+          (auto-detect separator)
+  Signal: df.iloc[:, 0].values (first column)
+  Sample rate: 4000 Hz (Physionet EMG dataset standard)
+  Downsample to 1000 Hz for processing:
+  from scipy.signal import decimate
+  signal = decimate(signal, q=4)
+
+DEMO MODE signal generation:
+  ECG demo: neurokit2.ecg_simulate(duration=30, 
+             sampling_rate=500, heart_rate=72)
+  EMG demo: Random bursts using numpy
+  EEG demo: Sum of sinusoids at band frequencies:
+    alpha = 0.5 * np.sin(2*pi*10*t)  (10 Hz)
+    beta = 0.2 * np.sin(2*pi*20*t)   (20 Hz)
+    noise = 0.1 * np.random.randn(len(t))
+    eeg = alpha + beta + noise
+
+═══════════════════════════════════════════════════════════
+REQUIREMENTS FILES
+═══════════════════════════════════════════════════════════
+
+backend/requirements.txt:
+fastapi>=0.104.0
+uvicorn[standard]>=0.24.0
+python-multipart>=0.0.6
+websockets>=12.0
+numpy>=1.24.0
+scipy>=1.11.0
+scikit-learn>=1.3.0
+imbalanced-learn>=0.11.0
+joblib>=1.3.0
+pandas>=2.0.0
+wfdb>=4.1.0
+mne>=1.6.0
+pyedflib>=0.1.22
+neurokit2>=0.2.7
+python-dotenv>=1.0.0
+
+frontend/package.json dependencies:
+react, react-dom, react-router-dom
+tailwindcss, @headlessui/react
+plotly.js, react-plotly.js
+recharts
+zustand
+axios
+react-dropzone
+framer-motion (for animations)
+lucide-react (icons)
+
+═══════════════════════════════════════════════════════════
+HOW TO RUN
+═══════════════════════════════════════════════════════════
+
+Backend:
+  cd backend
+  pip install -r requirements.txt
+  python train/train_ecg.py
+  python train/train_emg.py
+  python train/train_eeg.py
+  uvicorn main:app --reload --port 8000
+
+Frontend:
+  cd frontend
+  npm install
+  npm run dev
+  Opens at: http://localhost:5173
+
+═══════════════════════════════════════════════════════════
+BUILD ORDER
+═══════════════════════════════════════════════════════════
+
+Phase 1 — Backend core (build first):
+  1. main.py + CORS setup
+  2. core/pipeline.py (signal processing)
+  3. routers/upload.py (file parsing for all formats)
+  4. routers/analysis.py (run ML, return results)
+  5. Train all 3 models
+  6. Test all endpoints with Postman/curl
+
+Phase 2 — Frontend foundation:
+  7. React setup + Tailwind + routing
+  8. Landing.jsx (full landing page)
+  9. Zustand store
+  10. File upload UI + API connection
+
+Phase 3 — Analysis panels:
+  11. Analysis.jsx shell + tab navigation
+  12. ECGPanel.jsx with charts
+  13. EMGPanel.jsx with charts
+  14. EEGPanel.jsx with charts
+  15. FusionPanel.jsx (triple chart + risk gauge)
+
+Phase 4 — Polish:
+  16. WebSocket for hardware mode
+  17. Demo mode auto-scenarios
+  18. AI insight text generation
+  19. Export PDF button
+  20. Animations + final UI polish
+
+═══════════════════════════════════════════════════════════
+FINAL REQUIREMENTS
+═══════════════════════════════════════════════════════════
+
+1. ALL models must target >85% accuracy:
+   ECG: >88% (MIT-BIH is clean, RF handles it well)
+   EMG: >91% (3-class CSV files are clean)
+   EEG: >87% (CHB-MIT with proper windowing)
+
+2. Zero Streamlit — pure React frontend
+
+3. Landing page must feel like a real product
+
+4. All three CSV/EDF/DAT file formats must parse correctly
+
+5. Triple signal overlay chart is mandatory in fusion tab
+
+6. App must work fully offline — no external API calls
+
+7. Demo mode must work without any file upload
+
+8. Build everything completely — no placeholder functions
+
+Build this as a production-quality medical AI web application.
+Every component must be complete, styled, and functional.
+This needs to win a college hackathon.
