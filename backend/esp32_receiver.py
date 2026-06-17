@@ -52,6 +52,81 @@ def generate_eeg_sample(ts_millis: int) -> dict:
     }
 
 
+def generate_fallback_ecg(ts_millis: int) -> float:
+    """
+    Generate realistic PQRST ECG waveform when leads are off.
+    Uses the ESP32's real timestamp so waveform stays synchronized.
+    Mimics a healthy ~72 BPM heart rhythm.
+    """
+    t = ts_millis / 1000.0
+
+    # Breathing modulation (0.25 Hz = 15 breaths/min)
+    breath = math.sin(2 * math.pi * 0.25 * t)
+
+    # Heart rate with HRV: ~72 BPM ± small variation
+    hr_bpm = 72 + 2.0 * breath + 0.4 * math.sin(t * 0.09)
+    hr_freq = hr_bpm / 60.0
+    phase = (t * hr_freq) % 1.0
+
+    # Baseline ~1500mV (mid-range ADC)
+    ecg_val = 1500 + 6 * np.random.normal(0, 1)
+
+    # P wave (atrial depolarization)
+    if 0.0 < phase < 0.10:
+        ecg_val += 55 * math.sin(phase / 0.10 * math.pi)
+    # Q dip
+    elif 0.13 < phase < 0.17:
+        ecg_val -= 70 * math.sin((phase - 0.13) / 0.04 * math.pi)
+    # R spike (sharp)
+    elif 0.17 <= phase < 0.22:
+        ecg_val += 850 * math.sin((phase - 0.17) / 0.05 * math.pi)
+    # S dip
+    elif 0.22 <= phase < 0.26:
+        ecg_val -= 110 * math.sin((phase - 0.22) / 0.04 * math.pi)
+    # T wave (ventricular repolarization)
+    elif 0.38 < phase < 0.58:
+        ecg_val += 150 * math.sin((phase - 0.38) / 0.20 * math.pi)
+
+    # Breathing baseline wander
+    ecg_val += 15 * breath
+
+    return float(ecg_val)
+
+
+def generate_fallback_emg(ts_millis: int) -> float:
+    """
+    Generate realistic EMG activity when leads are off.
+    Shows clean baseline with brief voluntary contractions every ~5s.
+    """
+    t = ts_millis / 1000.0
+
+    emg_val = 1500 + np.random.normal(0, 10)
+
+    # Brief muscle contraction every ~5 seconds
+    cycle = t % 5.0
+    if cycle < 0.8:
+        frac = cycle / 0.8
+        emg_val += 250 * math.sin(frac * math.pi) * abs(np.random.normal(1, 0.15))
+
+    return float(emg_val)
+
+
+# Track if ECG is railed (static) — check last N values
+_ecg_rail_detector = deque(maxlen=10)
+
+
+def _is_ecg_railed(ecg_val: float) -> bool:
+    """Detect if ECG is stuck at rail voltage (3300mV or 0mV)."""
+    _ecg_rail_detector.append(ecg_val)
+    if len(_ecg_rail_detector) < 5:
+        return False
+    vals = list(_ecg_rail_detector)
+    # If all recent values are the same (railed) or near max/min
+    spread = max(vals) - min(vals)
+    avg = sum(vals) / len(vals)
+    return spread < 5 and (avg > 3200 or avg < 100)
+
+
 async def esp32_websocket_handler(websocket: WebSocket):
     """
     WebSocket endpoint that accepts data FROM the ESP32 device.
@@ -59,6 +134,9 @@ async def esp32_websocket_handler(websocket: WebSocket):
 
     Expected JSON from ESP32:
         {"ts": <millis>, "ecg": <mV>, "emg": <mV>, "leadOff": <bool>, "device": "esp32_biofusion"}
+
+    When leads are off or ECG is railed (static 3300mV), automatically
+    switches to realistic fallback waveforms so the dashboard stays dynamic.
     """
     await websocket.accept()
     print("[ESP32] Device connected via WebSocket")
@@ -69,26 +147,46 @@ async def esp32_websocket_handler(websocket: WebSocket):
             raw = await websocket.receive_text()
             data = json.loads(raw)
 
+            ts = data.get("ts", 0)
+            raw_ecg = data.get("ecg", 0)
+            raw_emg = data.get("emg", 0)
+            lead_off = data.get("leadOff", False)
+
+            # Detect railed/static ECG (leads off or no body contact)
+            ecg_railed = _is_ecg_railed(raw_ecg)
+            use_fallback = lead_off or ecg_railed
+
+            if use_fallback:
+                # Generate realistic waveforms from ESP32 timestamp
+                ecg_val = generate_fallback_ecg(ts)
+                emg_val = generate_fallback_emg(ts)
+            else:
+                # Use REAL sensor data
+                ecg_val = raw_ecg
+                emg_val = raw_emg
+
             # Update latest cache
             esp32_data_cache.update(data)
+            esp32_data_cache["ecg"] = ecg_val
+            esp32_data_cache["emg"] = emg_val
 
             # Append to rolling buffers
-            ECG_BUFFER.append(data.get("ecg", 0))
-            EMG_BUFFER.append(data.get("emg", 0))
+            ECG_BUFFER.append(ecg_val)
+            EMG_BUFFER.append(emg_val)
 
             # Generate simulated EEG for this frame
-            ts = data.get("ts", 0)
             eeg = generate_eeg_sample(ts)
             EEG_BUFFER.append(eeg)
 
             # Build unified sensor frame for dashboard clients
             frame = {
                 "type":    "sensor_frame",
-                "ts":      data.get("ts", 0),
-                "ecg":     data.get("ecg", 0),
-                "emg":     data.get("emg", 0),
+                "ts":      ts,
+                "ecg":     ecg_val,
+                "emg":     emg_val,
                 "eeg":     eeg,
-                "leadOff": data.get("leadOff", False),
+                "leadOff": lead_off,
+                "fallback": use_fallback,  # let dashboard know if fallback is active
             }
 
             # Broadcast to all connected dashboard clients

@@ -24,6 +24,7 @@ export interface SensorFrame {
   emg: number;
   eeg: EEGBands;
   leadOff: boolean;
+  fallback?: boolean;
 }
 
 export interface LiveInferenceResult {
@@ -90,6 +91,7 @@ export function useESP32Stream() {
   const [emgHistory, setEMGHistory] = useState<number[]>([]);
   const [eegLatest, setEEGLatest] = useState<EEGBands | null>(null);
   const [leadOff, setLeadOff] = useState(false);
+  const [fallbackActive, setFallbackActive] = useState(false);
   const [connected, setConnected] = useState(false);
   const [inference, setInference] = useState<LiveInferenceResult | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
@@ -167,6 +169,7 @@ export function useESP32Stream() {
           });
           setEEGLatest(frame.eeg);
           setLeadOff(frame.leadOff);
+          setFallbackActive(!!frame.fallback);
         }
       } catch {
         // Ignore malformed messages
@@ -191,6 +194,7 @@ export function useESP32Stream() {
     emgHistory,
     eegLatest,
     leadOff,
+    fallbackActive,
     connected,
     inference,
   };
