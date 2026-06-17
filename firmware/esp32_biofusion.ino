@@ -19,9 +19,9 @@
 #include <ArduinoJson.h>
 
 // ─── CONFIG ───────────────────────────────────────────────
-const char* SSID       = "YOUR_WIFI_SSID";
-const char* PASSWORD   = "YOUR_WIFI_PASSWORD";
-const char* WS_HOST    = "192.168.1.100";  // Your PC's local IP (run ipconfig)
+const char* SSID       = "M's 9 pro";
+const char* PASSWORD   = "c2ys4kkk";
+const char* WS_HOST    = "10.134.110.6";  // Your PC's local IP (run ipconfig)
 const int   WS_PORT    = 8000;             // Must match backend port
 const char* WS_PATH    = "/ws/esp32";      // Backend WebSocket endpoint
 

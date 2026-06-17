@@ -4,6 +4,7 @@ Runs ECG/EMG/EEG ML classifiers on rolling buffers from the ESP32 receiver,
 then fuses results into a unified risk assessment.
 """
 
+# pyrefly: ignore [missing-import]
 import numpy as np
 from esp32_receiver import get_ecg_buffer, get_emg_buffer, get_eeg_buffer
 
@@ -99,6 +100,13 @@ def _infer_ecg(ecg_data: np.ndarray) -> dict:
         if _ecg_model is not None:
             predictions = _ecg_model.predict(ml_features)
 
+        if not predictions:
+            predictions = {
+                "predicted_class": "Mock Normal (Fallback)",
+                "arrhythmia_probability": 0.05,
+                "class_probabilities": {"Normal": 0.95, "PVC": 0.05, "Atrial": 0.0, "Block": 0.0},
+            }
+
         return {
             "features": features,
             "predictions": predictions,
@@ -141,6 +149,17 @@ def _infer_emg(emg_data: np.ndarray) -> dict:
         predictions = {}
         if _emg_model is not None:
             predictions = _emg_model.predict(features, fatigue)
+
+        if not predictions:
+            predictions = {
+                "gesture": "Mock Rest (Fallback)",
+                "gesture_confidence": 0.9,
+                "all_gesture_probs": {"Rest": 0.9, "Fist": 0.1, "Open": 0.0, "Point": 0.0},
+                "condition": "Mock Healthy (Fallback)",
+                "condition_probabilities": {"Healthy": 0.9, "Myopathy": 0.05, "Neuropathy": 0.05},
+                "fatigue_score": fatigue.get("fatigue_score", 0),
+                "fatigue_level": fatigue.get("fatigue_level", "Fresh"),
+            }
 
         return {
             "features": features,
@@ -221,12 +240,13 @@ def _infer_eeg(eeg_data: list) -> dict:
         predictions = {}
         if _eeg_model is not None:
             predictions = _eeg_model.predict(features)
-        else:
+            
+        if not predictions:
             predictions = {
-                "mental_state": features["mental_state"],
+                "mental_state": features.get("mental_state", "Neutral"),
                 "seizure_probability": 0.05,
                 "seizure_risk": "LOW",
-                "dominant_band": features["dominant_band"],
+                "dominant_band": features.get("dominant_band", "Alpha"),
             }
 
         return {

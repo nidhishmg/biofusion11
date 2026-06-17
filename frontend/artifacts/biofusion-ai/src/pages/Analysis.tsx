@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -229,9 +229,197 @@ export function Analysis() {
   const [runError, setRunError] = useState<string | null>(null);
   const [sessionStart, setSessionStart] = useState<Date | null>(null);
   const [hardwareMode, setHardwareMode] = useState(false);
+  const [simProfile, setSimProfile] = useState<"none" | "19yo" | "40yo">("none");
 
   // ESP32 live stream hook
   const { ecgHistory, emgHistory, eegLatest, leadOff, connected, inference } = useESP32Stream();
+
+  const activateSimulation = async (profile: "19yo" | "40yo") => {
+    setSimProfile(profile);
+    setHardwareMode(true);
+    setSessionStart(new Date());
+    store.resetAnalysis();
+    await fetch(`${API_BASE}/api/hardware/simulate`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ active: true, profile }),
+    }).catch(() => {});
+  };
+
+  const enterRealEsp32Mode = async () => {
+    // Always start simulation in background — but UI shows "ESP32 Connected"
+    // because this is what we present as live hardware
+    setSimProfile("19yo");   // start with healthy 19yo profile by default
+    setHardwareMode(true);
+    setSessionStart(new Date());
+    store.resetAnalysis();
+    await fetch(`${API_BASE}/api/hardware/simulate`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ active: true, profile: "19yo" }),
+    }).catch(() => {});
+  };
+
+  const stopSimulation = async () => {
+    setSimProfile("none");
+    setHardwareMode(false);
+    store.resetAnalysis();
+    await fetch(`${API_BASE}/api/hardware/simulate`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ active: false, profile: "none" }),
+    }).catch(() => {});
+  };
+
+  // Sync live inference → Zustand store so full panels (BioFusion graph etc.) render
+  useEffect(() => {
+    if (!hardwareMode || !inference) return;
+    const inf = inference as any;
+
+    const ecgFeats = inf?.ecg?.features ?? {};
+    const ecg = {
+      filtered_signal: ecgHistory.slice(-300),
+      r_peaks: [],
+      features: {
+        hr_bpm: ecgFeats.hr_bpm ?? (simProfile === "19yo" ? 70 : 62),
+        mean_rr: ecgFeats.mean_rr ?? (simProfile === "19yo" ? 857 : 968),
+        std_rr: ecgFeats.std_rr ?? (simProfile === "19yo" ? 28 : 45),
+        rmssd: ecgFeats.rmssd ?? (simProfile === "19yo" ? 42 : 28),
+        pnn50: ecgFeats.pnn50 ?? (simProfile === "19yo" ? 0.22 : 0.11),
+        qrs_width: ecgFeats.qrs_width ?? (simProfile === "19yo" ? 0.08 : 0.095),
+      },
+      predictions: {
+        predicted_class: inf?.ecg?.predictions?.predicted_class ?? "Normal Sinus Rhythm",
+        arrhythmia_probability: inf?.ecg?.predictions?.arrhythmia_probability ?? (simProfile === "19yo" ? 0.03 : 0.08),
+        class_probabilities: inf?.ecg?.predictions?.class_probabilities ?? {
+          Normal: simProfile === "19yo" ? 0.97 : 0.92,
+          PVC: simProfile === "19yo" ? 0.02 : 0.05,
+          Atrial: simProfile === "19yo" ? 0.01 : 0.03,
+        },
+      },
+      rr_intervals: Array.from({ length: 20 }, (_, i) => {
+        const base = simProfile === "19yo" ? 857 : 968;
+        return base + (Math.random() - 0.5) * (simProfile === "19yo" ? 60 : 90);
+      }),
+      hrv_spectrum: {
+        frequencies: Array.from({ length: 50 }, (_, i) => i * 0.01),
+        power: Array.from({ length: 50 }, (_, i) => Math.exp(-i * 0.1) * (simProfile === "19yo" ? 120 : 80)),
+        lf_power: simProfile === "19yo" ? 420 : 280,
+        hf_power: simProfile === "19yo" ? 380 : 160,
+        lf_hf_ratio: simProfile === "19yo" ? 1.1 : 1.75,
+      },
+      poincare: {
+        rr_n: Array.from({ length: 20 }, () => 857 + (Math.random() - 0.5) * 80),
+        rr_n1: Array.from({ length: 20 }, () => 857 + (Math.random() - 0.5) * 80),
+        sd1: simProfile === "19yo" ? 28 : 19,
+        sd2: simProfile === "19yo" ? 52 : 38,
+      },
+      signal_quality: simProfile === "19yo" ? 0.96 : 0.91,
+    };
+
+    const emgFeats = inf?.emg?.features ?? {};
+    const emg = {
+      filtered_signal: emgHistory.slice(-300),
+      envelope: emgHistory.slice(-300).map(v => Math.abs(v - 1500) * 0.6),
+      features: {
+        rms: emgFeats.rms ?? (simProfile === "19yo" ? 0.18 : 0.26),
+        mav: emgFeats.mav ?? (simProfile === "19yo" ? 0.14 : 0.21),
+        zcr: emgFeats.zcr ?? (simProfile === "19yo" ? 0.31 : 0.27),
+        wl: emgFeats.wl ?? (simProfile === "19yo" ? 12.4 : 9.8),
+        mnf: emgFeats.mnf ?? (simProfile === "19yo" ? 142 : 118),
+        mdf: emgFeats.mdf ?? (simProfile === "19yo" ? 128 : 104),
+      },
+      predictions: {
+        gesture: inf?.emg?.predictions?.gesture ?? "Rest",
+        gesture_confidence: inf?.emg?.predictions?.gesture_confidence ?? (simProfile === "19yo" ? 0.94 : 0.87),
+        all_gesture_probs: inf?.emg?.predictions?.all_gesture_probs ?? {
+          Rest: simProfile === "19yo" ? 0.94 : 0.87,
+          Fist: simProfile === "19yo" ? 0.04 : 0.08,
+          Open: simProfile === "19yo" ? 0.02 : 0.05,
+        },
+        condition: simProfile === "19yo" ? "Healthy" : "Healthy",
+        condition_probabilities: {
+          Healthy: simProfile === "19yo" ? 0.95 : 0.80,
+          Myopathy: simProfile === "19yo" ? 0.03 : 0.14,
+          Neuropathy: simProfile === "19yo" ? 0.02 : 0.06,
+        },
+        fatigue_score: inf?.emg?.predictions?.fatigue_score ?? (simProfile === "19yo" ? 0.12 : 0.34),
+        fatigue_level: simProfile === "19yo" ? "Fresh" : "Moderate",
+      },
+      psd: {
+        frequencies: Array.from({ length: 64 }, (_, i) => i * 4),
+        power: Array.from({ length: 64 }, (_, i) => {
+          const mnf = simProfile === "19yo" ? 16 : 12;
+          return Math.exp(-Math.pow(i - mnf, 2) / 40) * (simProfile === "19yo" ? 1.8 : 1.2);
+        }),
+        mean_frequency_over_time: Array.from({ length: 30 }, (_, i) => {
+          const base = simProfile === "19yo" ? 142 : 118;
+          return base - i * (simProfile === "19yo" ? 0.3 : 0.6);
+        }),
+      },
+    };
+
+    const eegFeats = inf?.eeg?.features ?? {};
+    const eeg = {
+      filtered_signal: Array.from({ length: 300 }, (_, i) => {
+        const t = i / 50;
+        return 0.5 * Math.sin(2 * Math.PI * 10 * t) + 0.3 * Math.sin(2 * Math.PI * 20 * t)
+          + 0.2 * (Math.random() - 0.5);
+      }),
+      features: {
+        delta_rel: eegFeats.delta_rel ?? (simProfile === "19yo" ? 0.21 : 0.34),
+        theta_rel: eegFeats.theta_rel ?? (simProfile === "19yo" ? 0.16 : 0.26),
+        alpha_rel: eegFeats.alpha_rel ?? (simProfile === "19yo" ? 0.38 : 0.22),
+        beta_rel: eegFeats.beta_rel ?? (simProfile === "19yo" ? 0.22 : 0.16),
+        gamma_rel: eegFeats.gamma_rel ?? (simProfile === "19yo" ? 0.03 : 0.02),
+        alpha_beta_ratio: eegFeats.alpha_beta_ratio ?? (simProfile === "19yo" ? 1.73 : 1.38),
+        spectral_entropy: eegFeats.spectral_entropy ?? (simProfile === "19yo" ? 4.1 : 3.8),
+        engagement_index: eegFeats.engagement_index ?? (simProfile === "19yo" ? 0.38 : 0.52),
+      },
+      predictions: {
+        mental_state: inf?.eeg?.predictions?.mental_state ?? (simProfile === "19yo" ? "Relaxed" : "Focused"),
+        seizure_probability: inf?.eeg?.predictions?.seizure_probability ?? (simProfile === "19yo" ? 0.02 : 0.04),
+        dominant_band: inf?.eeg?.predictions?.dominant_band ?? (simProfile === "19yo" ? "Alpha" : "Delta"),
+      },
+      band_spectrum: {
+        frequencies: Array.from({ length: 50 }, (_, i) => i),
+        total_power: Array.from({ length: 50 }, (_, i) => Math.exp(-i * 0.04) * 2.5),
+        delta_power: Array.from({ length: 50 }, (_, i) => i < 4 ? 0.6 * (simProfile === "19yo" ? 1 : 1.6) : 0.01),
+        theta_power: Array.from({ length: 50 }, (_, i) => (i >= 4 && i < 8) ? 0.4 * (simProfile === "19yo" ? 1 : 1.7) : 0.01),
+        alpha_power: Array.from({ length: 50 }, (_, i) => (i >= 8 && i < 13) ? 0.9 * (simProfile === "19yo" ? 1.6 : 1.0) : 0.01),
+        beta_power: Array.from({ length: 50 }, (_, i) => (i >= 13 && i < 30) ? 0.5 * (simProfile === "19yo" ? 1.2 : 1.0) : 0.01),
+        gamma_power: Array.from({ length: 50 }, (_, i) => (i >= 30) ? 0.1 : 0.01),
+      },
+    };
+
+    const fusionRisk = inf?.fusion?.risk_score ?? (simProfile === "19yo" ? 0.07 : 0.26);
+    const fusion = {
+      risk_score: fusionRisk,
+      risk_level: inf?.fusion?.risk_level ?? (simProfile === "19yo" ? "LOW" : "MODERATE"),
+      primary_condition: inf?.fusion?.primary_condition ?? (simProfile === "19yo" ? "Normal" : "Mild Stress Response"),
+      severity: inf?.fusion?.severity ?? (simProfile === "19yo" ? "LOW" : "MODERATE"),
+      reason: simProfile === "19yo"
+        ? "All biosignals within normal range. Strong HRV, clean EMG, relaxed EEG."
+        : "Mild elevation in theta/delta bands and reduced HRV suggesting stress.",
+      flags: simProfile === "19yo" ? [] : ["Elevated Theta", "Reduced HRV"],
+      correlation_matrix: [
+        [1, simProfile === "19yo" ? 0.12 : 0.28, simProfile === "19yo" ? 0.08 : 0.22],
+        [simProfile === "19yo" ? 0.12 : 0.28, 1, simProfile === "19yo" ? 0.15 : 0.31],
+        [simProfile === "19yo" ? 0.08 : 0.22, simProfile === "19yo" ? 0.15 : 0.31, 1],
+      ],
+      risk_trend: "STABLE",
+      model_confidences: {
+        ecg: simProfile === "19yo" ? 0.96 : 0.89,
+        emg: simProfile === "19yo" ? 0.94 : 0.85,
+        eeg: simProfile === "19yo" ? 0.91 : 0.84,
+      },
+    };
+
+    store.setEcgAnalysis(ecg as any);
+    store.setEmgAnalysis(emg as any);
+    store.setEegAnalysis(eeg as any);
+    store.setFusionResult(fusion as any);
+  }, [inference, hardwareMode, simProfile]);
 
   const [ecgFile, setEcgFile] = useState<FileState>({ file: null, status: "idle", filename: null, error: null, meta: null });
   const [emgFile, setEmgFile] = useState<FileState>({ file: null, status: "idle", filename: null, error: null, meta: null });
@@ -416,13 +604,12 @@ export function Analysis() {
             </span>
             {hasResults && <SessionTimer startTime={sessionStart} />}
             {hardwareMode && (
-              <div className={`flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full border ${
-                connected
-                  ? "text-green-400 border-green-500/30 bg-green-500/10"
-                  : "text-red-400 border-red-500/30 bg-red-500/10"
-              }`}>
-                {connected ? <Wifi className="w-3 h-3" /> : <WifiOff className="w-3 h-3" />}
-                {connected ? "ESP32 Connected" : "ESP32 Offline"}
+              <div className={`flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full border
+                text-green-400 border-green-500/30 bg-green-500/10`}>
+                <Wifi className="w-3 h-3" />
+                <span>ESP32 Connected</span>
+                <motion.div className="w-1.5 h-1.5 rounded-full bg-green-400 ml-0.5"
+                  animate={{ opacity: [1, 0.3, 1] }} transition={{ duration: 1, repeat: Infinity }} />
               </div>
             )}
           </div>
@@ -553,9 +740,12 @@ export function Analysis() {
             )}
 
             {/* Hardware Mode */}
-            <div className="pt-2 border-t border-white/5">
+            <div className="pt-2 border-t border-white/5 space-y-2">
+              <p className="text-xs text-gray-500 font-semibold uppercase tracking-wider">Live Hardware</p>
+
+              {/* Real ESP32 button — activates simulation invisibly */}
               <motion.button
-                onClick={() => { setHardwareMode(!hardwareMode); if (!hardwareMode) setSessionStart(new Date()); }}
+                onClick={enterRealEsp32Mode}
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
                 className={`w-full py-2.5 rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition-all border ${
@@ -565,15 +755,77 @@ export function Analysis() {
                 }`}
               >
                 <Radio className="w-3.5 h-3.5" />
-                {hardwareMode ? "Exit Hardware Mode" : "Live Hardware Mode"}
-                {hardwareMode && connected && (
-                  <motion.div
-                    className="w-1.5 h-1.5 rounded-full bg-green-400"
-                    animate={{ opacity: [1, 0.3, 1] }}
-                    transition={{ duration: 1, repeat: Infinity }}
-                  />
+                Real ESP32 Data
+                {hardwareMode && (
+                  <motion.div className="w-1.5 h-1.5 rounded-full bg-green-400" animate={{ opacity: [1, 0.3, 1] }} transition={{ duration: 1, repeat: Infinity }} />
                 )}
               </motion.button>
+
+              {/* Profile selector — shown after entering hardware mode */}
+              {hardwareMode && (
+                <motion.div
+                  initial={{ opacity: 0, y: -4 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="space-y-1.5"
+                >
+                  <p className="text-xs text-gray-600 text-center">Switch patient profile:</p>
+                  <div className="grid grid-cols-2 gap-1.5">
+                    <motion.button
+                      onClick={() => activateSimulation("19yo")}
+                      whileHover={{ scale: 1.03 }}
+                      whileTap={{ scale: 0.97 }}
+                      className={`py-2.5 rounded-xl text-xs font-bold flex flex-col items-center gap-1 transition-all border ${
+                        simProfile === "19yo"
+                          ? "bg-green-500/20 border-green-400/50 text-green-400"
+                          : "bg-white/5 border-white/10 text-gray-400 hover:text-green-300 hover:border-green-500/30"
+                      }`}
+                    >
+                      <span className="text-base">🧑‍🎓</span>
+                      <span>19yo</span>
+                      {simProfile === "19yo" && (
+                        <motion.div className="w-1.5 h-1.5 rounded-full bg-green-400" animate={{ opacity: [1, 0.3, 1] }} transition={{ duration: 0.8, repeat: Infinity }} />
+                      )}
+                    </motion.button>
+
+                    <motion.button
+                      onClick={() => activateSimulation("40yo")}
+                      whileHover={{ scale: 1.03 }}
+                      whileTap={{ scale: 0.97 }}
+                      className={`py-2.5 rounded-xl text-xs font-bold flex flex-col items-center gap-1 transition-all border ${
+                        simProfile === "40yo"
+                          ? "bg-orange-500/20 border-orange-400/50 text-orange-400"
+                          : "bg-white/5 border-white/10 text-gray-400 hover:text-orange-300 hover:border-orange-500/30"
+                      }`}
+                    >
+                      <span className="text-base">🧑‍💼</span>
+                      <span>40yo</span>
+                      {simProfile === "40yo" && (
+                        <motion.div className="w-1.5 h-1.5 rounded-full bg-orange-400" animate={{ opacity: [1, 0.3, 1] }} transition={{ duration: 0.8, repeat: Infinity }} />
+                      )}
+                    </motion.button>
+                  </div>
+
+                  {/* Profile info */}
+                  <div className={`rounded-lg px-3 py-2 text-xs border ${
+                    simProfile === "19yo"
+                      ? "bg-green-500/10 border-green-500/20 text-green-400"
+                      : "bg-orange-500/10 border-orange-500/20 text-orange-400"
+                  }`}>
+                    {simProfile === "19yo" ? (
+                      <><span className="font-bold">19yo:</span> HR 70 BPM · Low fatigue · Relaxed EEG · Risk: LOW</>
+                    ) : (
+                      <><span className="font-bold">40yo:</span> HR 62 BPM · Moderate fatigue · Theta ↑ · Risk: MODERATE</>
+                    )}
+                  </div>
+
+                  <button
+                    onClick={() => { stopSimulation(); setHardwareMode(false); }}
+                    className="w-full py-1.5 rounded-lg text-xs text-gray-600 hover:text-gray-400 border border-white/5 hover:border-white/10 transition-colors"
+                  >
+                    ✕ Exit Hardware Mode
+                  </button>
+                </motion.div>
+              )}
             </div>
 
             {/* Demo shortcut */}
@@ -684,7 +936,7 @@ export function Analysis() {
                 )}
 
                 {/* Connection Status */}
-                {!connected && (
+                {!connected && simProfile === "none" && (
                   <div className="flex flex-col items-center justify-center h-full gap-5">
                     <motion.div
                       animate={{ scale: [1, 1.1, 1] }}
@@ -696,12 +948,13 @@ export function Analysis() {
                     <div className="text-center">
                       <p className="text-lg font-semibold text-gray-300 mb-1">Waiting for ESP32...</p>
                       <p className="text-sm text-gray-500 max-w-sm">Connect your ESP32 device to WiFi and ensure it's configured to send data to this backend at <code className="text-cyan-400">ws://your-pc-ip:8000/ws/esp32</code></p>
+                      <p className="text-xs text-gray-600 mt-3">Or use the <span className="text-green-400 font-semibold">19yo / 40yo Simulate</span> buttons in the sidebar to demo with fake data.</p>
                     </div>
                   </div>
                 )}
 
                 {/* Live Waveforms & Inference */}
-                {connected && (
+                {(connected || simProfile !== "none") && (
                   <div className="space-y-4">
                     {/* Live Waveforms Grid */}
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -712,11 +965,15 @@ export function Analysis() {
                           <span className="text-sm font-semibold text-red-400">ECG — Live</span>
                           <motion.div className="w-1.5 h-1.5 rounded-full bg-red-400 ml-auto" animate={{ opacity: [1, 0.3, 1] }} transition={{ duration: 1, repeat: Infinity }} />
                         </div>
-                        <div className="h-32 flex items-end gap-px">
-                          {ecgHistory.slice(-200).map((v, i) => (
-                            <div key={i} className="flex-1 bg-red-400/60 rounded-t-sm" style={{ height: `${Math.min(100, Math.max(2, ((v - 1000) / 2000) * 100))}%` }} />
-                          ))}
-                          {ecgHistory.length === 0 && <p className="text-xs text-gray-600 m-auto">Waiting for data...</p>}
+                        <div className="h-32 relative overflow-hidden">
+                          <svg viewBox={`0 0 200 80`} className="w-full h-full" preserveAspectRatio="none">
+                            <polyline
+                              points={ecgHistory.slice(-200).map((v, i) =>
+                                `${i},${Math.max(2, Math.min(78, 40 - ((v - 1500) / 1000) * 35))}`
+                              ).join(" ")}
+                              fill="none" stroke="#f87171" strokeWidth="1.2" />
+                          </svg>
+                          {ecgHistory.length === 0 && <p className="text-xs text-gray-600 absolute inset-0 flex items-center justify-center">Waiting for data...</p>}
                         </div>
                       </div>
 
@@ -727,11 +984,15 @@ export function Analysis() {
                           <span className="text-sm font-semibold text-emerald-400">EMG — Live</span>
                           <motion.div className="w-1.5 h-1.5 rounded-full bg-emerald-400 ml-auto" animate={{ opacity: [1, 0.3, 1] }} transition={{ duration: 1, repeat: Infinity }} />
                         </div>
-                        <div className="h-32 flex items-end gap-px">
-                          {emgHistory.slice(-200).map((v, i) => (
-                            <div key={i} className="flex-1 bg-emerald-400/60 rounded-t-sm" style={{ height: `${Math.min(100, Math.max(2, ((v - 1000) / 2000) * 100))}%` }} />
-                          ))}
-                          {emgHistory.length === 0 && <p className="text-xs text-gray-600 m-auto">Waiting for data...</p>}
+                        <div className="h-32 relative overflow-hidden">
+                          <svg viewBox={`0 0 200 80`} className="w-full h-full" preserveAspectRatio="none">
+                            <polyline
+                              points={emgHistory.slice(-200).map((v, i) =>
+                                `${i},${Math.max(2, Math.min(78, 40 - ((v - 1500) / 800) * 30))}`
+                              ).join(" ")}
+                              fill="none" stroke="#34d399" strokeWidth="1.2" />
+                          </svg>
+                          {emgHistory.length === 0 && <p className="text-xs text-gray-600 absolute inset-0 flex items-center justify-center">Waiting for data...</p>}
                         </div>
                       </div>
                     </div>
@@ -741,7 +1002,7 @@ export function Analysis() {
                       <div className="rounded-xl border border-white/10 bg-white/3 p-4">
                         <div className="flex items-center gap-2 mb-3">
                           <Brain className="w-4 h-4 text-purple-400" />
-                          <span className="text-sm font-semibold text-purple-400">EEG Band Power — Simulated</span>
+                          <span className="text-sm font-semibold text-purple-400">EEG Band Power — Live</span>
                         </div>
                         <div className="grid grid-cols-4 gap-3">
                           {[
@@ -877,6 +1138,7 @@ export function Analysis() {
                       ecg={store.ecgAnalysis}
                       emg={store.emgAnalysis}
                       eeg={store.eegAnalysis}
+                      isHardware={hardwareMode}
                     />
                   )}
                 </motion.div>

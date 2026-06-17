@@ -9,6 +9,7 @@ import numpy as np
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
 
 # Add backend to path
 sys.path.insert(0, os.path.dirname(__file__))
@@ -26,6 +27,8 @@ from esp32_receiver import (
     dashboard_websocket_handler,
     get_ecg_buffer, get_emg_buffer, get_eeg_buffer,
     is_esp32_connected,
+    hardware_simulation_loop,
+    set_simulation_state
 )
 import live_inference
 
@@ -55,6 +58,9 @@ async def lifespan(app: FastAPI):
 
     # Inject models into live inference module (for ESP32 real-time analysis)
     live_inference.set_models(ecg_model, emg_model, eeg_model, fusion_engine)
+
+    # Start simulation task
+    asyncio.create_task(hardware_simulation_loop())
 
     print("[OK] All models loaded. Server ready.")
     yield
@@ -160,6 +166,17 @@ async def dashboard_ws(websocket: WebSocket):
 async def run_inference():
     """Run all ML classifiers on current ESP32 sensor buffers and return fused results."""
     return live_inference.run_live_inference()
+
+
+class SimulateRequest(BaseModel):
+    active: bool
+    profile: str = "19yo"
+
+@app.post("/api/hardware/simulate")
+async def toggle_simulation(req: SimulateRequest):
+    """Enable or disable fake ESP32 data streaming for testing."""
+    set_simulation_state(req.active, req.profile)
+    return {"status": "success", "mode": req.active, "profile": req.profile}
 
 
 @app.get("/api/sensor/buffers")
